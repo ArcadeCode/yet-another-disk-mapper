@@ -1,5 +1,5 @@
 [package]
-name = "yet-another-disk-mapper"
+name = "yadm"
 version = "0.1.0"
 edition = "2021"
 
