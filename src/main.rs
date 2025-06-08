@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::collections::HashMap;
-use rmp_serde::encode;
+use rmp_serde;
 use walkdir::WalkDir;
 
 mod yadm;
@@ -64,7 +64,7 @@ fn main() {
     println!("3. Encoding + writing MessagePack...");
     let msgpack_parsing_start = Instant::now();
 
-    let encoded: Vec<u8> = encode::to_vec(&hashmap).unwrap();
+    let encoded: Vec<u8> = rmp_serde::encode::to_vec(&hashmap).unwrap();
     let mut file: File = File::create("output.msgpack").expect("Impossible de créer le fichier");
     file.write_all(&encoded).expect("Impossible d'écrire dans le fichier");
 
