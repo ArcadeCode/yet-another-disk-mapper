@@ -1,0 +1,25 @@
+name: Rustfmt Check
+
+on:
+  push:
+    branches:
+      - '**'  # Toutes les branches
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Rust toolchain
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source $HOME/.cargo/env
+        rustup component add rustfmt
+
+    - name: Run rustfmt check
+      run: |
+        source $HOME/.cargo/env
+        cargo fmt -- --check

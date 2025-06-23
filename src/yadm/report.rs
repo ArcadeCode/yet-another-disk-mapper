@@ -24,14 +24,15 @@ pub mod report {
 
     impl fmt::Display for Report {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "Scan of {} found {} elements in {:?}",
-                self.target,
-                self.elements_found,
-                self.full_duration
+            write!(
+                f,
+                "Scan of {} found {} elements in {:?}",
+                self.target, self.elements_found, self.full_duration
             )?;
 
             write!(
-                f, "
+                f,
+                "
 === YADM report ===
 Target : {}
 Scan duration : {:.2}s
