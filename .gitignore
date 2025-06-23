@@ -2,3 +2,5 @@
 .vscode/
 output.msgpack
 **.msgpack
+**.temp
+**.zst

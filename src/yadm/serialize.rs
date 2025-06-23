@@ -3,6 +3,7 @@ use walkdir::WalkDir;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use zstd;
 
 /// TODO: Faire la doc
 pub fn serialize(path: &Path) {
@@ -28,6 +29,16 @@ pub fn serialize(path: &Path) {
         }).collect()
     }
 
+    // Step 3 : We serializing the Vector to a message pack.
+    fn serialize_to_msgpack(hashmap: &Vec<HashMap<String, String>>) -> File {
+        let encoded: Vec<u8> = rmp_serde::encode::to_vec(&hashmap).unwrap();
+        let mut file: File = File::create("output.msgpack.temp").expect("Creation of the file impossible");
+        file.write_all(&encoded).expect("Writing of the file impossible");
+        // We will rewriting the file using the file content but this technique isn't good for production
+        // In the futur commit, TODO: replacing this with a stream flux and output into a file AFTER.
+        return file;
+    }
+
     // We check if the path go to only one File to skip the WalkDir call if not needed.
     let hashmap: Vec<HashMap<String, String>> = if path.is_file() {
         parsing_to_hashmap(&[path.to_path_buf()])
@@ -35,7 +46,22 @@ pub fn serialize(path: &Path) {
         parsing_to_hashmap(&scan_dir(path))
     };
 
-    let encoded: Vec<u8> = rmp_serde::encode::to_vec(&hashmap).unwrap();
-    let mut file: File = File::create("output.msgpack").expect("Creation of the file impossible");
-    file.write_all(&encoded).expect("Writing of the file impossible");
-}
+    // Sérialisation MsgPack dans fichier temporaire
+    serialize_to_msgpack(&hashmap);
+
+    // Ouvrir le fichier sérialisé en lecture
+    let mut uncompressed_file = File::open("output.msgpack.temp").expect("Failed to open serialized file");
+
+    // Ouvrir un fichier de sortie pour recevoir la version compressée
+    let output_file = File::create("output.msgpack.zst").expect("Failed to create output compressed file");
+
+    // Compresser du fichier sérialisé vers le fichier compressé avec un niveau de compression à 22 (max)
+    zstd::stream::copy_encode(&mut uncompressed_file, output_file, 22)
+        .expect("Compression failed");
+
+    match std::fs::remove_file(Path::new("output.msgpack.temp")) {
+        Ok(_) => println!("Fichier supprimé avec succès !"),
+        Err(e) => eprintln!("Erreur lors de la suppression du fichier : {}", e),
+    }
+
+    }
