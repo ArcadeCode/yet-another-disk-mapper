@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use zstd;
 
+use super::report::Report;
+
 /// TODO: Faire la doc
 pub fn serialize(path: &Path) {
     // Step 1 : Getting all entities into the Path
@@ -57,15 +59,31 @@ pub fn serialize(path: &Path) {
         return file;
     }
 
+    // Report give some informations to know how good or bad this version of YADM was.
+    let mut report: Report = Report::new(path.to_path_buf());
+
     // We check if the path go to only one File to skip the WalkDir call if not needed.
     let hashmap: Vec<HashMap<String, String>> = if path.is_file() {
+        // Because we didn't scan a directory, we intialized
+        report.elements_found = 1;
+        report.time_hashmap_parsing();
         parsing_to_hashmap(&[path.to_path_buf()])
     } else {
-        parsing_to_hashmap(&scan_dir(path))
+        report.time_scan();
+        let entries: Vec<PathBuf> = scan_dir(path);
+        report.time_scan();
+        report.elements_found = entries.len();
+
+        report.time_hashmap_parsing();
+        parsing_to_hashmap(&entries)
     };
 
-    // Sérialisation MsgPack dans fichier temporaire
+    report.time_hashmap_parsing(); // Here we stop the timer
+
+    // Serialization into msgpack format
+    report.time_msgpack_parsing();
     serialize_to_msgpack(&hashmap);
+    report.time_msgpack_parsing();
 
     // Ouvrir le fichier sérialisé en lecture
     let mut uncompressed_file =
@@ -75,11 +93,16 @@ pub fn serialize(path: &Path) {
     let output_file =
         File::create("output.msgpack.zst").expect("Failed to create output compressed file");
 
+    report.time_zstd_compression();
     // Compresser du fichier sérialisé vers le fichier compressé avec un niveau de compression à 22 (max)
     zstd::stream::copy_encode(&mut uncompressed_file, output_file, 22).expect("Compression failed");
+    report.time_zstd_compression();
 
     match std::fs::remove_file(Path::new("output.msgpack.temp")) {
         Ok(_) => println!("Fichier supprimé avec succès !"),
         Err(e) => eprintln!("Erreur lors de la suppression du fichier : {}", e),
     }
+
+    report.close_report();
+    println!("{}", report);
 }
