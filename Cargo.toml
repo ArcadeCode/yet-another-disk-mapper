@@ -2,8 +2,10 @@
 name = "yadm"
 version = "0.1.0"
 edition = "2021"
+authors = ["Dervaux Esteban <e.dervauxx@gmail.com>"]
 
 [dependencies]
+clap = { version = "4.5.40", features = ["derive"] }
 rmp-serde = "1.3.0"
 serde = "1.0.219"
 walkdir = "2.5.0"

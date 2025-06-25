@@ -8,7 +8,7 @@ use zstd;
 use super::report::Report;
 
 /// TODO: Faire la doc
-pub fn serialize(path: &Path) {
+pub fn serialize(path: &Path, use_zstd: bool, verbose: bool) {
     // Step 1 : Getting all entities into the Path
     fn scan_dir(path: &Path) -> Vec<PathBuf> {
         WalkDir::new(path)
@@ -19,7 +19,7 @@ pub fn serialize(path: &Path) {
             .collect()
     }
 
-    // Step 2 : Creating a list of dictionary with all related and useful informations.
+    // Step 2 : Creating a list of dictionary with all related and useful information.
     fn parsing_to_hashmap(entries: &[PathBuf]) -> Vec<HashMap<String, String>> {
         entries
             .iter()
@@ -51,7 +51,7 @@ pub fn serialize(path: &Path) {
     fn serialize_to_msgpack(hashmap: &Vec<HashMap<String, String>>) -> File {
         let encoded: Vec<u8> = rmp_serde::encode::to_vec(&hashmap).unwrap();
         let mut file: File =
-            File::create("output.msgpack.temp").expect("Creation of the file impossible");
+            File::create("map.msgpack.temp").expect("Creation of the file impossible");
         file.write_all(&encoded)
             .expect("Writing of the file impossible");
         // We will rewriting the file using the file content but this technique isn't good for production
@@ -59,7 +59,7 @@ pub fn serialize(path: &Path) {
         return file;
     }
 
-    // Report give some informations to know how good or bad this version of YADM was.
+    // Report give some information to know how good or bad this version of YADM was.
     let mut report: Report = Report::new(path.to_path_buf());
 
     // We check if the path go to only one File to skip the WalkDir call if not needed.
@@ -85,24 +85,35 @@ pub fn serialize(path: &Path) {
     serialize_to_msgpack(&hashmap);
     report.time_msgpack_parsing();
 
-    // Ouvrir le fichier sérialisé en lecture
-    let mut uncompressed_file =
-        File::open("output.msgpack.temp").expect("Failed to open serialized file");
+    if use_zstd {
+        // Ouvrir le fichier sérialisé en lecture
+        let mut uncompressed_file =
+            File::open("map.msgpack.temp").expect("Failed to open serialized file");
 
-    // Ouvrir un fichier de sortie pour recevoir la version compressée
-    let output_file =
-        File::create("output.msgpack.zst").expect("Failed to create output compressed file");
+        // Ouvrir un fichier de sortie pour recevoir la version compressée
+        let output_file =
+            File::create("map.msgpack.zst").expect("Failed to create output compressed file");
 
-    report.time_zstd_compression();
-    // Compresser du fichier sérialisé vers le fichier compressé avec un niveau de compression à 22 (max)
-    zstd::stream::copy_encode(&mut uncompressed_file, output_file, 22).expect("Compression failed");
-    report.time_zstd_compression();
+        report.time_zstd_compression();
+        // Compresser du fichier sérialisé vers le fichier compressé avec un niveau de compression à 22 (max)
+        zstd::stream::copy_encode(&mut uncompressed_file, output_file, 22).expect("Compression failed");
+        report.time_zstd_compression();
 
-    match std::fs::remove_file(Path::new("output.msgpack.temp")) {
-        Ok(_) => println!("Fichier supprimé avec succès !"),
-        Err(e) => eprintln!("Erreur lors de la suppression du fichier : {}", e),
+        match std::fs::remove_file(Path::new("map.msgpack.temp")) {
+            Ok(_) => println!("Fichier supprimé avec succès !"),
+            Err(e) => eprintln!("Erreur lors de la suppression du fichier : {}", e),
+        }
+    } else {
+        match std::fs::rename(Path::new("map.msgpack.temp"), Path::new("map.msgpack")) {
+            Ok(_) => println!("Fichier supprimé avec succès !"),
+            Err(e) => eprintln!("Erreur lors de la suppression du fichier : {}", e),
+        }
     }
+    
 
     report.close_report();
-    println!("{}", report);
+    if verbose {
+        // FIXME: In the futur, we need to implement a dummy report struct to skip all timers when "verbose" is set to false
+        println!("{}", report);
+    }
 }
